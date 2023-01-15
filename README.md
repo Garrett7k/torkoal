@@ -4,5 +4,5 @@ Can Join, Leave, Mute, Deafen, Unmute, Undeafen and Play a single source audio (
 
 Current Implementation goals are to:
 1) Create a play_looped function that will loop provided url
-2) Implement functionality that will search for provided text and play first youtube search result (instead of URL)
-  2.e) play hacker music
+2) Implement functionality that will search for provided text and play first youtube search result (instead of URL, IE:
+play hacker music)
