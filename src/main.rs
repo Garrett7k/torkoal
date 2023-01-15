@@ -22,7 +22,6 @@ use serenity::{
     prelude::GatewayIntents,
     Result as SerenityResult,
 };
-use songbird::input::*;
 
 struct Handler;
 
@@ -36,7 +35,7 @@ impl EventHandler for Handler {
 //Current list of commands
 //When adding extra commands, you must add the command call to this list.
 #[group]
-#[commands(deafen, join, leave, mute, play, help, undeafen, unmute)]
+#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, search_and_play)]
 struct General;
 
 #[tokio::main]
@@ -247,7 +246,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
             },
         };
 
-        handler.play_source(source);
+        handler.play_only_source(source);
 
         check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
     } else {
@@ -314,7 +313,41 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+#[command]
+async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
+     
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
 
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
+        
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let source = match songbird::input::ytdl_search(&arg_string).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("```Err starting source: {:?}```", why);
+
+                check_msg(msg.channel_id.say(&ctx.http, "```Error sourcing ffmpeg```").await);
+
+                return Ok(());
+            },
+        };
+
+        handler.play_only_source(source);
+
+        check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
+    } else {
+        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel to play in```").await);
+    }
+    
+    
+    
+    Ok(())
+}
 /// Checks that a message successfully sent; if not, then logs why to stdout.
 fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
