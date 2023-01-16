@@ -308,15 +308,19 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
         "```Hi! 
         To use Torkoal, 
         you first must be in voice channel. From there, invite me to the channel by using the '~join' command.
-        After that, I will accept '~play <ytlink>' commands to stream audio to you and your friends!
-        Here is a list of all the commands I currently accept [mute, unmute, deafen, undeafen, leave, join, play, and help]```").await);
+        Here is a list of all the commands I currently accept: 
+        [mute, unmute, deafen, undeafen, join, leave, play, search_and_play and help]```").await);
 
     Ok(())
 }
 #[command]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    //collects command arg into a vector. with a space inbetween each word.
+    //IE: ~search_and_play swimswim pier 34
+    //prints out swimswim pier 34
     let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
-     
+    //later used in ytdl_search() function to have a proper search query.
+    
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
 
@@ -345,12 +349,12 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
     }
     
     
-    
     Ok(())
 }
+
 /// Checks that a message successfully sent; if not, then logs why to stdout.
 fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
-        println!("```Error sending message: {:?}```", why);
+        println!("Error sending message: {:?}", why);
     }
 }
