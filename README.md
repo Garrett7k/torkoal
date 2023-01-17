@@ -6,3 +6,4 @@ Current Implementation goals are to:
 1) Create a play_looped function that will loop provided url
 2) Implement functionality that will search for provided text and play first youtube search result (instead of URL, IE:
 search_and_play hacker music) **COMPLETED**
+3) Implement stop/skip feature to avoid having to leave and re-join bot to stop audio sources. **COMPLETED**
