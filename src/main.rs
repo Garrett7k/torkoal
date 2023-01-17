@@ -251,7 +251,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
         check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
     } else {
-        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel to play in```").await);
+        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
     }
 
     Ok(())
@@ -348,7 +348,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
         check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
     } else {
-        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel to play in```").await);
+        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
 }
     
     
