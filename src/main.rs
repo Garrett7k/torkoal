@@ -1,5 +1,6 @@
 use std::env;
 
+use serenity::model::prelude::command;
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
@@ -35,7 +36,7 @@ impl EventHandler for Handler {
 //Current list of commands
 //When adding extra commands, you must add the command call to this list.
 #[group]
-#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, search_and_play)]
+#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, search_and_play, stop)]
 struct General;
 
 #[tokio::main]
@@ -303,17 +304,19 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[only_in(guilds)]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     check_msg(msg.channel_id.say(&ctx.http, 
         "```Hi! 
         To use Torkoal, 
         you first must be in voice channel. From there, invite me to the channel by using the '~join' command.
         Here is a list of all the commands I currently accept: 
-        [mute, unmute, deafen, undeafen, join, leave, play, search_and_play and help]```").await);
+        [mute, unmute, deafen, undeafen, join, leave, play, search_and_play, stop and help]```").await);
 
     Ok(())
 }
 #[command]
+#[only_in(guilds)]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
     //IE: ~search_and_play swimswim pier 34
@@ -346,9 +349,32 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
         check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel to play in```").await);
-    }
+}
     
     
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
+    
+    
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx).await
+    .expect("Songbird Voice client placed in at initialisation.").clone();
+        
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        handler.stop();
+
+        check_msg(msg.channel_id.say(&ctx.http, "```Stopping source```").await);
+    } else {
+        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
+}
     Ok(())
 }
 
