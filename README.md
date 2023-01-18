@@ -1,6 +1,6 @@
 # torkoal
 Baseline discord bot with minimal functionality. 
-Can Join, Leave, Mute, Deafen, Unmute, Undeafen, Search and Play and Play a single YT audio source (that doesnt overlap like songbird example).
+Can Join, Leave, Mute, Deafen, Unmute, Undeafen, Search and Play, Stop/Skip and Play a single YT audio source (that doesnt overlap like songbird example).
 
 Current Implementation goals are to:
 1) Create a play_looped function that will loop provided url
