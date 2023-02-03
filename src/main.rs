@@ -118,6 +118,7 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[aliases(comehere)]
 #[only_in(guilds)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -135,6 +136,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
             return Ok(());
         }
     };
+    check_msg(msg.channel_id.say(&ctx.http, "```Joined voice channel```").await);
 
     let manager = songbird::get(ctx).await
         .expect("Songbird Voice client placed in at initialisation.").clone();
@@ -145,6 +147,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[aliases(goodbye, unjoin)]
 #[only_in(guilds)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -309,7 +312,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     check_msg(msg.channel_id.say(&ctx.http, 
         "```Hi! 
         To use Torkoal, 
-        you first must be in voice channel. From there, invite me to the channel by using the '~join' command.
+        you first must be in a voice channel. From there, invite me to the channel by using the '~join' command.
         Here is a list of all the commands I currently accept: 
         [mute, unmute, deafen, undeafen, join, leave, play, search_and_play, stop and help]```").await);
 
