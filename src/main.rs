@@ -318,6 +318,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
 #[command]
 #[aliases(sap)]
 #[only_in(guilds)]
