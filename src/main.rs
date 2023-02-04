@@ -36,7 +36,7 @@ impl EventHandler for Handler {
 //Current list of commands
 //When adding extra commands, you must add the command call to this list.
 #[group]
-#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, search_and_play, stop)]
+#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, stop, search_and_play)]
 struct General;
 
 #[tokio::main]
@@ -319,6 +319,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 #[command]
+#[aliases(sap)]
 #[only_in(guilds)]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
