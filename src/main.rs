@@ -307,6 +307,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[aliases(h)]
 #[only_in(guilds)]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     check_msg(msg.channel_id.say(&ctx.http, 
