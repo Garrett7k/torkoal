@@ -9,7 +9,7 @@ search_and_play hacker music) **COMPLETED**
 3) Implement stop/skip feature to avoid having to leave and re-join bot to stop audio sources. **COMPLETED**
 
 
-To Compile (On Ubuntu):
+Dependencies needed to compile (On Ubuntu):
 
 sudo apt install ffmpeg
 
