@@ -11,5 +11,7 @@ search_and_play hacker music) **COMPLETED**
 
 To Compile (On Ubuntu): 
 sudo apt install ffmpeg
+
 sudo apt install youtube-dl
+
 sudo apt install libopus-dev
