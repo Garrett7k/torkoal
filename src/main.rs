@@ -1,10 +1,11 @@
 use std::env;
 
 
+use songbird::input::Input;
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
-use songbird::SerenityInit;
+use songbird::{SerenityInit};
 
 // Import the `Context` to handle commands.
 use serenity::client::Context;
@@ -36,7 +37,7 @@ impl EventHandler for Handler {
 //Current list of commands
 //When adding extra commands, you must add the command call to this list.
 #[group]
-#[commands(deafen, join, leave, mute, play, help, undeafen, unmute, stop, search_and_play)]
+#[commands(deafen, join, leave, mute, play_from_url, help, undeafen, unmute, stop, search_and_play, search_and_play_loop)]
 struct General;
 
 #[tokio::main]
@@ -213,8 +214,9 @@ async fn ping(context: &Context, msg: &Message) -> CommandResult {
 */
 
 #[command]
+#[aliases(pfu)]
 #[only_in(guilds)]
-async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
         Ok(url) => url,
         Err(_) => {
@@ -315,7 +317,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
         To use Torkoal, 
         you first must be in a voice channel. From there, invite me to the channel by using the '~join' command.
         Here is a list of all the commands I currently accept: 
-        [mute, unmute, deafen, undeafen, join, leave, play, search_and_play, stop and help]```").await);
+        [mute, unmute, deafen, undeafen, join, leave, play_from_url, search_and_play, search_and_play_loop, stop and help]```").await);
 
     Ok(())
 }
@@ -349,10 +351,15 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                 return Ok(());
             },
         };
-
-        handler.play_only_source(source);
-
-        check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
+       
+        
+        let trackhandle = handler.play_only_source(source);
+        let trackhandle_metadata = trackhandle.metadata();
+        let trackhandle_title = trackhandle_metadata.title.as_ref().unwrap();
+        let tracktitle_to_be_displayed = format!("```Playing song: {trackhandle_title}```");
+        
+        
+        check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
 }
@@ -360,6 +367,54 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
     
     Ok(())
 }
+
+
+#[command]
+#[aliases(sapl)]
+#[only_in(guilds)]
+async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    //collects command arg into a vector. with a space inbetween each word.
+    //IE: ~search_and_play swimswim pier 34
+    //prints out swimswim pier 34
+    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
+    //later used in ytdl_search() function to have a proper search query.
+    
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
+        
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        let source = match  songbird::input::restartable::Restartable::ytdl_search(&arg_string, true).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("```Err starting source: {:?}```", why);
+
+                check_msg(msg.channel_id.say(&ctx.http, "```Error sourcing ffmpeg```").await);
+
+                return Ok(());
+            },
+        };
+        let loopable_source_to_input_source = Input::from(source);
+
+        let loopable_trackhandle = handler.play_only_source(loopable_source_to_input_source);
+        let loopable_trackhandle_metadata = loopable_trackhandle.metadata();
+        let loopable_trackhandle_title = loopable_trackhandle_metadata.title.as_ref().unwrap();
+        let tracktitle_to_be_displayed = format!("```Playing song: {loopable_trackhandle_title}```");
+        loopable_trackhandle.enable_loop().unwrap();
+       
+        check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
+    } else {
+        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
+}
+    Ok(())
+}
+
+
+
 
 #[command]
 #[only_in(guilds)]
