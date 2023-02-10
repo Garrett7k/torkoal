@@ -242,10 +242,12 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                 return Ok(());
             },
         };
-
+        let title = source.metadata.title.clone().unwrap_or("Unknown".to_string());
+        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+    
         handler.play_only_source(source);
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Playing song```").await);
+        check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
     }
@@ -342,12 +344,10 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                 return Ok(());
             },
         };
-       
         
-        let trackhandle = handler.play_only_source(source);
-        let trackhandle_metadata = trackhandle.metadata();
-        let trackhandle_title = trackhandle_metadata.title.as_ref().unwrap();
-        let tracktitle_to_be_displayed = format!("```Playing song: {trackhandle_title}```");
+        let title = source.metadata.title.clone().unwrap_or("Unknown".to_string());
+        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+        handler.play_only_source(source);
         
         
         check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
@@ -390,11 +390,10 @@ async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> Comma
             },
         };
         let loopable_source_to_input_source = Input::from(source);
+        let title = loopable_source_to_input_source.metadata.title.clone().unwrap_or("Unknown".to_string());
+        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
 
         let loopable_trackhandle = handler.play_only_source(loopable_source_to_input_source);
-        let loopable_trackhandle_metadata = loopable_trackhandle.metadata();
-        let loopable_trackhandle_title = loopable_trackhandle_metadata.title.as_ref().unwrap();
-        let tracktitle_to_be_displayed = format!("```Playing song: {loopable_trackhandle_title}```");
         loopable_trackhandle.enable_loop().unwrap();
        
         check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
