@@ -62,7 +62,6 @@ async fn main() {
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     //intents: 1 1 0 1 1 0 1
     //1101101 is the binary value of the intents variable that has both non_privileged and MESSAGE_CONTENT gateway intents.
-    //Thanks ChatGPT ^^
     
     
     //Initialize bot client with preset token, intents, handler, framework
@@ -204,17 +203,9 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-/*
-#[command]
-async fn ping(context: &Context, msg: &Message) -> CommandResult {
-    check_msg(msg.channel_id.say(&context.http, "Pong!").await);
-
-    Ok(())
-}
-*/
 
 #[command]
-#[aliases(pfu)]
+#[aliases(pfu, play)]
 #[only_in(guilds)]
 async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
@@ -429,10 +420,10 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
         
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-
+    
         handler.stop();
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Stopping source```").await);
+        check_msg(msg.channel_id.say(&ctx.http, "```Stopping audio source```").await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
 }
