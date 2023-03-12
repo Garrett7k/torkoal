@@ -310,7 +310,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
         To use Torkoal, 
         you first must be in a voice channel. From there, invite me to the channel by using the '~join' command.
         Here is a list of all the commands I currently accept: 
-        [mute, unmute, deafen, undeafen, join, leave, play_from_url, search_and_play, search_and_play_loop, stop and help]```").await);
+        [mute, unmute, deafen, undeafen, join, leave, play_from_url(pfu, play), search_and_play(sap), search_and_play_loop(sapl), stop and help]```").await);
 
     Ok(())
 }
