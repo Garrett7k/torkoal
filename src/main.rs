@@ -2,17 +2,18 @@ use std::env;
 
 
 use songbird::input::Input;
+use songbird::tracks::{PlayMode, TrackHandle, TrackState};
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
 use songbird::{SerenityInit};
 
 // Import the `Context` to handle commands.
-use serenity::client::Context;
+//use serenity::client::Context;
 
 use serenity::{
     async_trait,
-    client::{Client, EventHandler},
+    client::{Client, EventHandler, Context},
     framework::{
         StandardFramework,
         standard::{
@@ -20,7 +21,7 @@ use serenity::{
             macros::{command, group},
         },
     },
-    model::{channel::Message, gateway::Ready},
+    model::{channel::Message, gateway::Ready, gateway::Activity, gateway::ActivityType},
     prelude::GatewayIntents,
     Result as SerenityResult,
 };
@@ -29,9 +30,15 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, context: Context, ready: Ready) {
+        let osrs = "Oldschool RuneScape: Getting Purples at Tombs of Amascut.";
+        
         println!("{} is connected!", ready.user.name);
+        
+        context.set_activity(Activity::playing(osrs)).await;
+        
     }
+
 }
 
 //Current list of commands
@@ -244,9 +251,12 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         };
         let title = source.metadata.title.clone().unwrap_or("Unknown".to_string());
         let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+        
+        
     
-        handler.play_only_source(source);
-
+        handler.play_only_source(source);   
+        
+        
         check_msg(msg.channel_id.say(&ctx.http, tracktitle_to_be_displayed).await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
@@ -420,7 +430,7 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
     
-        handler.stop();
+       handler.stop();
 
         check_msg(msg.channel_id.say(&ctx.http, "```Stopping audio source```").await);
     } else {
