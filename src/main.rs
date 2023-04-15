@@ -1,6 +1,11 @@
 use std::env;
+use chatgpt::prelude::*;
+use std::path::Path;
+use std::fs;
+use chatgpt::err::Error::*;
 
 
+use chatgpt::types::CompletionResponse;
 use songbird::input::Input;
 use songbird::tracks::{PlayMode, TrackHandle, TrackState};
 // This trait adds the `register_songbird` and `register_songbird_with` methods
@@ -44,7 +49,7 @@ impl EventHandler for Handler {
 //Current list of commands
 //When adding extra commands, you must add the command call to this list.
 #[group]
-#[commands(deafen, join, leave, mute, play_from_url, help, undeafen, unmute, stop, search_and_play, search_and_play_loop)]
+#[commands(deafen, join, leave, mute, play_from_url, help, undeafen, unmute, stop, search_and_play, search_and_play_loop, chatgpt, chatgpt_convo)]
 struct General;
 
 #[tokio::main]
@@ -56,6 +61,7 @@ async fn main() {
     //Replace 'xxx' with your token
     let token = env::var("DISCORD_TOKEN")
         .expect("Expected a token in the environment");
+    
 
     let framework = StandardFramework::new()
         .configure(|c| c
@@ -444,4 +450,85 @@ fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
         println!("Error sending message: {:?}", why);
     }
+}
+
+
+#[command]
+#[aliases(gpt)]
+#[only_in(guilds)]
+async fn chatgpt(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
+    
+    let token = env::var("CHATGPT_TOKEN")
+        .expect("Expected a token in the environment");
+        
+    let chatgpt = ChatGPT::new(token)?; 
+    
+    let response: CompletionResponse = chatgpt.send_message(arg_string).await.unwrap();
+    //let cloned = response.message().content.clone();
+    
+    check_msg(msg.channel_id.say(&ctx.http, response.message().content.as_str()).await);
+    
+    Ok(())
+}
+
+#[command]
+#[aliases(gptc)]
+#[only_in(guilds)]
+async fn chatgpt_convo(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let arg_string_entry = args.raw().collect::<Vec<&str>>().join(" ");
+    //let append = String::from(" in 100 words or less.");
+   // let arg_string = format!("{}{}", arg_string_entry, append);
+    
+    
+    let token = env::var("CHATGPT_TOKEN")
+        .expect("Expected a token in the environment");
+        
+    let chatgpt = ChatGPT::new(token)?;
+    //let mut convo = chatgpt.new_conversation();
+    let mypath = Path::new("my-conversation.json");
+    let metadata = mypath.metadata().unwrap();
+    if metadata.len() > 14000 {
+            //let mut number = 0;
+            let newpath = Path::new("my-conversationold.json");
+            //let numberedpath = format!("{}{}", newpath.display(), number);
+            if !newpath.exists() {
+                let numberedpath = format!("{}{}", newpath.display(), metadata.len());
+                fs::rename(mypath, numberedpath).unwrap();
+                }
+            
+        }
+        
+    
+   
+    
+    if !mypath.exists() {
+        let mut convo = chatgpt.new_conversation();
+        let response: CompletionResponse = convo.send_message(arg_string_entry).await.unwrap();
+    
+    
+        check_msg(msg.channel_id.say(&ctx.http, response.message().content.as_str()).await);
+        convo.save_history_json("my-conversation.json").await?;
+        
+    } else {
+        let mut restored = chatgpt.restore_conversation_json("my-conversation.json").await?; 
+        let response = restored.send_message(arg_string_entry).await.unwrap();
+        
+    
+    
+        check_msg(msg.channel_id.say(&ctx.http, response.message().content.as_str()).await);
+        restored.save_history_json("my-conversation.json").await?;
+    }
+    
+   
+    
+   
+    
+    
+    //let response: CompletionResponse = restored.send_message(arg_string_entry).await.unwrap();
+    
+    
+   //check_msg(msg.channel_id.say(&ctx.http, response.message().content.as_str()).await);
+    //restored.save_history_json("my-conversation.json").await?;
+    Ok(())
 }
