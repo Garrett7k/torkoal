@@ -2,18 +2,19 @@
 name = "torkoal"
 version = "0.1.0"
 authors = ["7k, agent burks"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-futures = "0.2"
-songbird = "0.3.0"
+songbird = "0.3.1"
+chatgpt_rs = "1.0.0"
 
 
 [dependencies.serenity]
 version = "0.11"
-features = ["client", "standard_framework", "voice", "rustls_backend"]
+features = ["client", "standard_framework", "voice", "rustls_backend", "model"]
 
 [dependencies.tokio]
 version = "1.0"
