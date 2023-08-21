@@ -19,7 +19,6 @@ use serenity::{
         },
         StandardFramework,
     },
-    http,
     model::{channel::Message, gateway::Activity, gateway::Ready},
     prelude::GatewayIntents,
     Result as SerenityResult,
@@ -30,7 +29,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, context: Context, ready: Ready) {
-        let osrs = "Oldschool RuneScape: Getting Purples at Tombs of Amascut.";
+        let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric.";
         let user = ready.user;
 
         if let Ok(guilds) = user.guilds(&context.http).await {
@@ -40,6 +39,7 @@ impl EventHandler for Handler {
         }
 
         context.set_activity(Activity::playing(osrs)).await;
+        
     }
 }
 
