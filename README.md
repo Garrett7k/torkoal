@@ -1,6 +1,5 @@
 # torkoal
-Baseline discord bot with minimal functionality. 
-Can join, leave, mute, deafen, unmute, undeafen, search and play, stop, loop and play an audio source.
+Discord bot with minimal functionality. 
 
 
 Dependencies needed to compile (On Ubuntu):
