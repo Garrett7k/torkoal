@@ -1,5 +1,7 @@
 # torkoal
-Discord bot with minimal functionality. 
+Discord bot with minimal functionality. Breaks often.
+
+Use at your own will:
 
 
 Dependencies needed to compile (On Ubuntu):
