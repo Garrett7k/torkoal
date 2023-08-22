@@ -3,6 +3,8 @@ use std::env;
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 
+use std::path::Path;
+use std::fs;
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
@@ -66,6 +68,7 @@ impl EventHandler for Handler {
 )]
 struct General;
 
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -76,7 +79,7 @@ async fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefixes(vec!["!", ">", "~", ".", ","]).case_insensitivity(true))
+        .configure(|c| c.prefixes(vec!["!", ">", "~", ".", ",", "`"]).case_insensitivity(true))
         .group(&GENERAL_GROUP);
 
     //bitwise operand to provide an instance of the GatewayIntents struct that has both the functionality of non_privileged and MESSAGE_CONTENT gateway intents.
@@ -272,7 +275,6 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[aliases(pfu, play, p)]
 #[only_in(guilds)]
 async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
@@ -420,7 +422,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[aliases(sap)]
+#[aliases(sap, p, play, pfu, listen, find, audio)]
 #[only_in(guilds)]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
@@ -463,16 +465,36 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             .title
             .clone()
             .unwrap_or("Unknown".to_string());
+
+        let context_set = title.clone();
+
+        let source_artist = source
+        .metadata
+        .artist
+        .clone()
+        .unwrap_or("Unknown".to_string());
+
+        let thumbnail = source.metadata.thumbnail.clone().unwrap();
+        let l = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/7fbd888d-4a1d-41f7-ab72-404af6f4eec7/d3kmeku-93edd860-02ec-4d2e-b2a6-92aae3cc5b2a.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwic3ViIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsImF1ZCI6WyJ1cm46c2VydmljZTpmaWxlLmRvd25sb2FkIl0sIm9iaiI6W1t7InBhdGgiOiIvZi83ZmJkODg4ZC00YTFkLTQxZjctYWI3Mi00MDRhZjZmNGVlYzcvZDNrbWVrdS05M2VkZDg2MC0wMmVjLTRkMmUtYjJhNi05MmFhZTNjYzViMmEucG5nIn1dXX0.grsn79H7WZObDpRz6cYgXyA9fyucGzE_Y4VgQkXCRHQ";
+
+        
         let msg_author = &msg.author.name;
-        let timeframe = now.elapsed().as_millis();
-        let tracktitle_to_be_displayed = format!("```{msg_author} requested song: {title}.  Fetched request in {timeframe} ms.```");
+        let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
         handler.play_only_source(source);
-        ctx.set_activity(Activity::listening(title)).await;
-        check_msg(
-            msg
-            .channel_id.say(&ctx.http, tracktitle_to_be_displayed)
-            .await,
-        );
+        
+        let timeframe = now.elapsed().as_millis();
+        check_msg(msg
+            .channel_id
+            .send_message(&ctx.http,|m|
+            m
+            .embed(|e| e.title(format!("Now Playing:")).description(title).thumbnail(thumbnail.clone()).image(l).fields(vec![
+            (format!("Channel name: {source_artist}"), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
+            (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
+        ]))).await);
+
+        ctx.set_activity(Activity::listening(context_set)).await;
+
+    
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
     }
@@ -483,7 +505,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 }
 
 #[command]
-#[aliases(sapl)]
+#[aliases(sapl, pl, playl, pful, listenl, findl, audiol)]
 #[only_in(guilds)]
 async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
@@ -611,10 +633,6 @@ async fn remind(ctx: &Context, msg: &Message) -> CommandResult {
 
         
     No: :kiss_mm: Yes: :eggplant:")
-    .embed(|e| e.title("this is a title").description("This is a description").fields(vec![
-        ("This is the first field", "This is a field body", true),
-        ("This is the second field", "Both fields are inline", true),
-    ]).footer(|f| f.text("this is a footer")) )
     .add_file("/home/ox/torkoal/image.png"))
     .await);
     msg_clean_up(ctx, msg).await;
@@ -667,6 +685,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 #[aliases(a)]
 #[only_in(guilds)]
 async fn aliases(ctx: &Context, msg: &Message) -> CommandResult {
+
     check_msg(msg.channel_id.say(&ctx.http,
         "
         ```
@@ -680,7 +699,9 @@ async fn aliases(ctx: &Context, msg: &Message) -> CommandResult {
         Leave - goodbye, unjoin, l, gb, uj
         Remind - r
         ```").await);
-        msg_clean_up(ctx, msg).await;
+
+    msg_clean_up(ctx, msg).await;
+
     Ok(())
 }
 
