@@ -1,5 +1,8 @@
 use songbird::input::Input;
 use std::env;
+use std::time::{Duration, Instant};
+use std::thread::sleep;
+
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
@@ -37,7 +40,6 @@ impl EventHandler for Handler {
                 println!("{} is connected to: {}", user.name, guild.name);
             }
         }
-
         context.set_activity(Activity::playing(osrs)).await;
         
     }
@@ -222,6 +224,8 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(msg.reply(ctx, "```Not in a voice channel```").await);
     }
+    let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric. Also, going to the major. ~Help for help!";
+    ctx.set_activity(Activity::playing(osrs)).await;
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
@@ -330,7 +334,7 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
             .unwrap_or("Unknown".to_string());
         let msg_author = &msg.author.name;
         let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
-
+        ctx.set_activity(Activity::listening(title)).await;
         handler.play_only_source(source);
 
         check_msg(
@@ -424,6 +428,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
     //prints out swimswim pier 34
     let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
     //later used in ytdl_search() function to have a proper search query.
+    let now = Instant::now();
 
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -451,6 +456,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                 return Ok(());
             }
         };
+        
 
         let title = source
             .metadata
@@ -458,17 +464,20 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             .clone()
             .unwrap_or("Unknown".to_string());
         let msg_author = &msg.author.name;
-        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
+        let timeframe = now.elapsed().as_millis();
+        let tracktitle_to_be_displayed = format!("```{msg_author} requested song: {title}.  Fetched request in {timeframe} ms.```");
         handler.play_only_source(source);
-
+        ctx.set_activity(Activity::listening(title)).await;
         check_msg(
-            msg.channel_id
-                .say(&ctx.http, tracktitle_to_be_displayed)
-                .await,
+            msg
+            .channel_id.say(&ctx.http, tracktitle_to_be_displayed)
+            .await,
         );
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
     }
+    
+
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
@@ -518,10 +527,10 @@ async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> Comma
             .unwrap_or("Unknown".to_string());
         let msg_author = &msg.author.name;
         let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
-
+        ctx.set_activity(Activity::listening(format!("{title} on loop!" ))).await;
         let loopable_trackhandle = handler.play_only_source(loopable_source_to_input_source);
         loopable_trackhandle.enable_loop().unwrap();
-
+        
         check_msg(
             msg.channel_id
                 .say(&ctx.http, tracktitle_to_be_displayed)
@@ -568,6 +577,8 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
                 .await,
         );
     }
+    let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric. Also, going to the major. ~Help for help!";
+    ctx.set_activity(Activity::playing(osrs)).await;
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
@@ -600,9 +611,14 @@ async fn remind(ctx: &Context, msg: &Message) -> CommandResult {
 
         
     No: :kiss_mm: Yes: :eggplant:")
+    .embed(|e| e.title("this is a title").description("This is a description").fields(vec![
+        ("This is the first field", "This is a field body", true),
+        ("This is the second field", "Both fields are inline", true),
+    ]).footer(|f| f.text("this is a footer")) )
     .add_file("/home/ox/torkoal/image.png"))
     .await);
     msg_clean_up(ctx, msg).await;
+    
     Ok(())
 
 
@@ -624,10 +640,12 @@ async fn rename_channel(ctx: &Context, msg: &Message, args: Args) -> CommandResu
 
 }
 
+
 #[command]
 #[aliases(h)]
 #[only_in(guilds)]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
+
     check_msg(msg.channel_id.say(&ctx.http,
         "
         ```
@@ -640,6 +658,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
         
         Use the ~Aliases command for command aliases.
         ```").await);
+        
         msg_clean_up(ctx, msg).await;
     Ok(())
 }
