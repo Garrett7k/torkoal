@@ -19,7 +19,7 @@ use serenity::{
         },
         StandardFramework,
     },
-    model::{channel::Message, gateway::Activity, gateway::Ready},
+    model::{channel::Message, gateway::Activity, gateway::Ready, prelude::EmojiIdentifier},
     prelude::GatewayIntents,
     Result as SerenityResult,
 };
@@ -29,7 +29,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, context: Context, ready: Ready) {
-        let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric.";
+        let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric. Also, going to the major. ~Help for help!";
         let user = ready.user;
 
         if let Ok(guilds) = user.guilds(&context.http).await {
@@ -57,7 +57,10 @@ impl EventHandler for Handler {
     unmute,
     stop,
     search_and_play,
-    search_and_play_loop
+    search_and_play_loop,
+    remind,
+    aliases,
+    rename_channel
 )]
 struct General;
 
@@ -71,7 +74,7 @@ async fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("~"))
+        .configure(|c| c.prefixes(vec!["!", ">", "~", ".", ","]).case_insensitivity(true))
         .group(&GENERAL_GROUP);
 
     //bitwise operand to provide an instance of the GatewayIntents struct that has both the functionality of non_privileged and MESSAGE_CONTENT gateway intents.
@@ -125,6 +128,8 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     };
 
     let mut handler = handler_lock.lock().await;
+    let msg_author = &msg.author.name;
+    let deaf = format!("```{msg_author} deafened.```");
 
     if handler.is_deaf() {
         check_msg(
@@ -141,14 +146,14 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
             );
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Deafened```").await);
+        check_msg(msg.channel_id.say(&ctx.http, deaf).await);
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
 #[command]
-#[aliases(comehere, summon)]
+#[aliases(comehere, summon, sum, j, come, ch)]
 #[only_in(guilds)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -163,13 +168,15 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
         Some(channel) => channel,
         None => {
             check_msg(msg.reply(ctx, "```Not in a voice channel```").await);
-
+            msg_clean_up(ctx, msg).await;
             return Ok(());
         }
     };
+    let msg_author = &msg.author.name;
+    let summon = format!("```{msg_author} summoned.```");
     check_msg(
         msg.channel_id
-            .say(&ctx.http, "```Joined voice channel```")
+            .say(&ctx.http, summon)
             .await,
     );
 
@@ -179,12 +186,12 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
         .clone();
 
     let _handler = manager.join(guild_id, connect_to).await;
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
 #[command]
-#[aliases(goodbye, unjoin)]
+#[aliases(goodbye, unjoin, l, gb, uj)]
 #[only_in(guilds)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -204,16 +211,18 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
                     .await,
             );
         }
+        let msg_author = &msg.author.name;
+        let unsummon = format!("```{msg_author} unsummoned.```");
 
         check_msg(
             msg.channel_id
-                .say(&ctx.http, "```Left voice channel```")
+                .say(&ctx.http, unsummon)
                 .await,
         );
     } else {
         check_msg(msg.reply(ctx, "```Not in a voice channel```").await);
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -236,6 +245,8 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
             return Ok(());
         }
     };
+    let msg_author = &msg.author.name;
+    let muted = format!("```{msg_author} muted.```");
 
     let mut handler = handler_lock.lock().await;
 
@@ -250,25 +261,28 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
             );
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Now muted```").await);
+        check_msg(msg.channel_id.say(&ctx.http, muted).await);
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
 #[command]
-#[aliases(pfu, play)]
+#[aliases(pfu, play, p)]
 #[only_in(guilds)]
 async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
         Ok(url) => url,
-        Err(_) => {
+        Err(why) => {
+            println!("```Err starting source: {why:?}```");
+            let msg_author = &msg.author.name;
+            let url_error = format!("```{msg_author} - Error! {why}. Check command Arguments are correct.```");
             check_msg(
                 msg.channel_id
-                    .say(&ctx.http, "```Must provide a URL to a video or audio```")
+                    .say(&ctx.http, url_error)
                     .await,
             );
-
+            msg_clean_up(ctx, msg).await;
             return Ok(());
         }
     };
@@ -276,10 +290,10 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     if !url.starts_with("http") {
         check_msg(
             msg.channel_id
-                .say(&ctx.http, "```Must provide a valid URL```")
+                .say(&ctx.http, "```Must provide FULL URL. Https:// ```")
                 .await,
         );
-
+        msg_clean_up(ctx, msg).await;
         return Ok(());
     }
 
@@ -298,13 +312,14 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
             Ok(source) => source,
             Err(why) => {
                 println!("```Err starting source: {why:?}```");
-
+                let msg_author = &msg.author.name;
+                let ffmpeg_error = format!("```{msg_author} - Error! {why}. Check command Arguments are correct.```");
                 check_msg(
                     msg.channel_id
-                        .say(&ctx.http, "```Error sourcing ffmpeg```")
+                        .say(&ctx.http, ffmpeg_error)
                         .await,
                 );
-
+                msg_clean_up(ctx, msg).await;
                 return Ok(());
             }
         };
@@ -313,7 +328,8 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
             .title
             .clone()
             .unwrap_or("Unknown".to_string());
-        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+        let msg_author = &msg.author.name;
+        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
 
         handler.play_only_source(source);
 
@@ -323,9 +339,9 @@ async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
                 .await,
         );
     } else {
-        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
+        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -349,8 +365,10 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
                     .await,
             );
         }
+        let msg_author = &msg.author.name;
+        let undeaf = format!("```{msg_author} Undeafened.```");
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Undeafened```").await);
+        check_msg(msg.channel_id.say(&ctx.http, undeaf).await);
     } else {
         check_msg(
             msg.channel_id
@@ -358,7 +376,7 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
                 .await,
         );
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -382,8 +400,10 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
                     .await,
             );
         }
+        let msg_author = &msg.author.name;
+        let unmute = format!("```{msg_author} Unmuted.```");
 
-        check_msg(msg.channel_id.say(&ctx.http, "```Unmuted```").await);
+        check_msg(msg.channel_id.say(&ctx.http, unmute).await);
     } else {
         check_msg(
             msg.channel_id
@@ -391,21 +411,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
                 .await,
         );
     }
-
-    Ok(())
-}
-
-#[command]
-#[aliases(h)]
-#[only_in(guilds)]
-async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    check_msg(msg.channel_id.say(&ctx.http,
-        "```Hi! 
-        To use Torkoal, 
-        you first must be in a voice channel. From there, invite me to the channel by using the '~join' command.
-        Here is a list of all the commands I currently accept: 
-        [mute, unmute, deafen, undeafen, join, leave, play_from_url(pfu, play), search_and_play(sap), search_and_play_loop(sapl), stop and help]```").await);
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -434,13 +440,14 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             Ok(source) => source,
             Err(why) => {
                 println!("```Err starting source: {why:?}```");
-
+                let msg_author = &msg.author.name;
+                let ffmpeg_error = format!("```{msg_author} - Error! {why}. Check command Arguments are correct.```");
                 check_msg(
                     msg.channel_id
-                        .say(&ctx.http, "```Error sourcing ffmpeg```")
+                        .say(&ctx.http, ffmpeg_error)
                         .await,
                 );
-
+                msg_clean_up(ctx, msg).await;
                 return Ok(());
             }
         };
@@ -450,7 +457,8 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             .title
             .clone()
             .unwrap_or("Unknown".to_string());
-        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+        let msg_author = &msg.author.name;
+        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
         handler.play_only_source(source);
 
         check_msg(
@@ -459,9 +467,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                 .await,
         );
     } else {
-        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
+        check_msg(msg.channel_id.say(&ctx.http, "```Not in a voice channel. If im playing audio contact the authorities!```").await);
     }
-
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -491,13 +499,14 @@ async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> Comma
                 Ok(source) => source,
                 Err(why) => {
                     println!("```Err starting source: {why:?}```");
-
+                    let msg_author = &msg.author.name;
+                    let ffmpeg_error = format!("```{msg_author} - Error! {why}. Check command Arguments are correct.```");
                     check_msg(
                         msg.channel_id
-                            .say(&ctx.http, "```Error sourcing ffmpeg```")
+                            .say(&ctx.http, ffmpeg_error)
                             .await,
                     );
-
+                    msg_clean_up(ctx, msg).await;
                     return Ok(());
                 }
             };
@@ -507,7 +516,8 @@ async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> Comma
             .title
             .clone()
             .unwrap_or("Unknown".to_string());
-        let tracktitle_to_be_displayed = format!("```Playing song: {title}```");
+        let msg_author = &msg.author.name;
+        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
 
         let loopable_trackhandle = handler.play_only_source(loopable_source_to_input_source);
         loopable_trackhandle.enable_loop().unwrap();
@@ -518,8 +528,9 @@ async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> Comma
                 .await,
         );
     } else {
-        check_msg(msg.channel_id.say(&ctx.http, "``````Not in a voice channel. If im playing audio contact the authorities!``````").await);
+        check_msg(msg.channel_id.say(&ctx.http, "```Not in  voice channel. If im playing audio contact the authorities!```").await);
     }
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
@@ -539,9 +550,12 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
         handler.stop();
 
+        let msg_author = &msg.author.name;
+        let msg_display = format!("``` {msg_author} Stopped current audio source.```");
+
         check_msg(
             msg.channel_id
-                .say(&ctx.http, "```Stopping audio source```")
+                .say(&ctx.http, msg_display)
                 .await,
         );
     } else {
@@ -554,8 +568,107 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
                 .await,
         );
     }
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
+
+
+#[command]
+#[aliases(r)]
+#[only_in(guilds)]
+async fn remind(ctx: &Context, msg: &Message) -> CommandResult {
+
+    check_msg(msg.channel_id.send_message(&ctx.http,|m|
+        m
+        .content("
+    :bangbang: @everyone :bangbang:
+
+
+
+
+:bangbang: MONDAY/WEDNESDAY 8:30PM EST ESEA TOURNAMENT GAME. :bangbang:
+:bangbang: NO SHOWS WILL BE KICKED OFF ROSTER AFTER REPEATED OFFENCES. WE PAID 20$ TO PLAY, SHOW UP. REACT TO THIS POST TO CONFIRM ATTENDANCE. NO REACTION IS CONSIDERED NO SHOW. :bangbang:
+
+
+
+
+
+    :bangbang: @everyone :bangbang:
+
+
+
+
+        
+    No: :kiss_mm: Yes: :eggplant:")
+    .add_file("/home/ox/torkoal/image.png"))
+    .await);
+    msg_clean_up(ctx, msg).await;
+    Ok(())
+
+
+}
+
+
+
+#[command]
+#[aliases(rn)]
+#[only_in(guilds)]
+async fn rename_channel(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+
+    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
+    let t = msg.channel_id.edit(&ctx.http, |channel_name| channel_name.name(arg_string)).await.unwrap();
+    
+    
+    Ok(())
+
+
+}
+
+#[command]
+#[aliases(h)]
+#[only_in(guilds)]
+async fn help(ctx: &Context, msg: &Message) -> CommandResult {
+    check_msg(msg.channel_id.say(&ctx.http,
+        "
+        ```
+        Hi! 
+        To use Torkoal, 
+        you first must be in a voice channel. From there, invite me to the channel by using the '~join' command.
+        Here is a list of all the commands I currently accept: 
+
+        [mute, unmute, deafen, undeafen, join, leave, play_from_url, search_and_play, search_and_play_loop, stop, remind and help].
+        
+        Use the ~Aliases command for command aliases.
+        ```").await);
+        msg_clean_up(ctx, msg).await;
+    Ok(())
+}
+
+#[command]
+#[aliases(a)]
+#[only_in(guilds)]
+async fn aliases(ctx: &Context, msg: &Message) -> CommandResult {
+    check_msg(msg.channel_id.say(&ctx.http,
+        "
+        ```
+        Join -  comehere, summon, sum, j, come, ch
+        Help - h
+        Play_from_url - p, play, pfu
+        Search_and_play - sap
+        Search_and_play_loop - sapl
+        Aliases - a
+        Stop - s
+        Leave - goodbye, unjoin, l, gb, uj
+        Remind - r
+        ```").await);
+        msg_clean_up(ctx, msg).await;
+    Ok(())
+}
+
+async fn msg_clean_up(ctx: &Context, msg: &Message) {
+    msg.delete(&ctx.http).await.unwrap();
+}
+
 
 /// Checks that a message successfully sent; if not, then logs why to stdout.
 fn check_msg(result: SerenityResult<Message>) {
