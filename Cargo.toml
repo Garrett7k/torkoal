@@ -13,8 +13,21 @@ songbird = "0.3.2"
 
 [dependencies.serenity]
 version = "0.11.5"
-features = ["client", "standard_framework", "voice", "rustls_backend", "model"]
+features = [
+    "builder",
+    "chrono",
+    "client",
+    "framework",
+    "gateway",
+    "http",
+    "model",
+    "standard_framework",
+    "utils",
+    "rustls_backend",
+    "cache"
+]
+
 
 [dependencies.tokio]
 version = "1.28.2"
-features = ["macros", "rt-multi-thread", "signal"]
+features = ["full"]
