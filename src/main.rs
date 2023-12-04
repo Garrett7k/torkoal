@@ -426,8 +426,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guilds)]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
-    //IE: ~search_and_play swimswim pier 34
-    //prints out swimswim pier 34
+    //IE: ~search_and_play arg arg arg arg
     let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
     //later used in ytdl_search() function to have a proper search query.
     let now = Instant::now();
