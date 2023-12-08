@@ -16,8 +16,15 @@ sudo apt install libopus-dev
 
 Dependencies needed to compile (On Arch):
 
-pacman -Syu ffmpeg
+sudo pacman -Syu ffmpeg
 
-pacman -Syu youtube-dl
+sudo pacman -Syu youtube-dl (No longer works, you have to install youtube-dl via pip. sudo pacman -Syu python sudo pacman -Syu pip)
 
-pacman -Syu opus
+Once pip is installed and you confirmed python3.11 is installed, install youtube-dl via pip.
+
+sudo pip install youtube_dl --user --break-system-packages
+
+sudo pacman -Syu opus
+
+You will need to edit line 1794 in the youtube-dl extractor folder (pip installs in /home/user/.local/lin/python3.11/site-packages/youtube_dl/extractor/youtube.py) 
+This resolves the extrator uploader ID error. 
