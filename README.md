@@ -1,8 +1,15 @@
 # torkoal
 Discord bot with minimal functionality. Breaks often.
 
+
+
 Use at your own will:
 
+Create initial bot in discord developer portal. 
+
+Create your own token and add to system environment. 
+
+Typically able to set DISCORD_TOKEN env variable in /etc/environment for persistence. 
 
 Dependencies needed to compile (On Ubuntu):
 
