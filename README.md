@@ -10,7 +10,9 @@ sudo apt install ffmpeg
 
 sudo apt install youtube-dl
 
-sudo apt install libopus-dev
+sudo apt install libopus-dev 
+
+Follow the below step for Youtube-dl extractor fix.
 
 
 
@@ -26,5 +28,5 @@ sudo pip install youtube_dl --user --break-system-packages
 
 sudo pacman -Syu opus
 
-You will need to edit line 1794 in the youtube-dl extractor folder (pip installs in /home/user/.local/lin/python3.11/site-packages/youtube_dl/extractor/youtube.py) 
+You will need to edit line 1794 in the youtube-dl extractor file youtube.py (pip installs in /home/user/.local/lin/python3.11/site-packages/youtube_dl/extractor/youtube.py) 
 This resolves the extrator uploader ID error. 
