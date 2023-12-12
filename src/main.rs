@@ -1,9 +1,16 @@
-use songbird::input::Input;
+use songbird::{
+    input::Input,
+    driver::Driver,
+    id::GuildId,
+    tracks::TrackQueue,
+};
+    
 use std::env;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use std::fs;
+use std::fs::File;
 use std::path::Path;
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
@@ -442,7 +449,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-
+        
         let source = match songbird::input::ytdl_search(&arg_string).await {
             Ok(source) => source,
             Err(why) => {
@@ -474,7 +481,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
         let msg_author = &msg.author.name;
         let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
-        handler.play_only_source(source);
+        handler.enqueue_source(source);
+        //handler.play_only_source(source);
+        
 
         let timeframe = now.elapsed().as_millis();
         check_msg(msg
