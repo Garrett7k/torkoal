@@ -1,3 +1,4 @@
+use serenity::builder::CreateEmbedFooter;
 use songbird::{
     input::Input,
     driver::Driver,
@@ -71,7 +72,8 @@ impl EventHandler for Handler {
     search_and_play_loop,
     remind,
     aliases,
-    rename_channel
+    rename_channel,
+    queue_and_play
 )]
 struct General;
 
@@ -426,7 +428,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[aliases(sap, p, play, pfu, listen, find, audio)]
+#[aliases(sap, p, play, pfu, listen, find, audio, search, map)]
 #[only_in(guilds)]
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
@@ -449,6 +451,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
+        let queue = handler.queue();
         
         let source = match songbird::input::ytdl_search(&arg_string).await {
             Ok(source) => source,
@@ -481,7 +484,13 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
         let msg_author = &msg.author.name;
         let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
-        handler.enqueue_source(source);
+        
+
+        let song = handler.enqueue_source(source);
+        for qs in handler.queue().current_queue() {
+            check_msg(msg.channel_id.
+                send_message(&ctx.http, |m| m.embed(|e| e.description(format!("Queued: {:?}", qs.metadata().title.clone().unwrap_or("Unknown".to_string()))))).await);
+        }
         //handler.play_only_source(source);
         
 
@@ -490,10 +499,11 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             .channel_id
             .send_message(&ctx.http,|m|
             m
-            .embed(|e| e.title(format!("Now Playing:")).description(title).thumbnail(thumbnail.clone()).image(link).fields(vec![
+            .embed(|e| e.title(format!("Now Playing:")).description(title.clone()).thumbnail(thumbnail.clone()).image(link).fields(vec![
             (format!("Channel name:  {source_artist} "), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
             (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
         ]))).await);
+        
 
         ctx.set_activity(Activity::listening(context_set)).await;
     } else {
@@ -708,6 +718,103 @@ async fn aliases(ctx: &Context, msg: &Message) -> CommandResult {
 
     msg_clean_up(ctx, msg).await;
 
+    Ok(())
+}
+
+
+
+#[command]
+#[aliases(queue, q)]
+#[only_in(guilds)]
+async fn queue_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    //collects command arg into a vector. with a space inbetween each word.
+    //IE: ~commamd/alias arg arg arg
+    //prints out arg arg arg 
+    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
+    //later used in ytdl_search() function to have a proper search query.
+    
+    
+    //set a time to calc initialisation of command. 
+    //let now = Instant::now();
+
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+        
+        let source = match songbird::input::ytdl_search(&arg_string).await {
+            Ok(source) => source,
+            Err(why) => {
+                println!("```Err starting source (is this where it fails?): {why:?}```");
+                let msg_author = &msg.author.name;
+                let ffmpeg_error = format!("```{msg_author} - FFMPEG Error! {why}. Check command Arguments are correct.```");
+                check_msg(msg.channel_id.say(&ctx.http, ffmpeg_error).await);
+                msg_clean_up(ctx, msg).await;
+                return Ok(());
+            }
+        };
+
+        let title = source
+            .metadata
+            .title
+            .clone()
+            .unwrap_or("Unknown".to_string());
+
+        let context_set = title.clone();
+
+      /*  let source_artist = source
+            .metadata
+            .artist
+            .clone()
+            .unwrap_or("Unknown".to_string()); */
+
+      //  let thumbnail = source.metadata.thumbnail.clone().unwrap();
+      //  let link = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/7fbd888d-4a1d-41f7-ab72-404af6f4eec7/d3kmeku-93edd860-02ec-4d2e-b2a6-92aae3cc5b2a.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwic3ViIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsImF1ZCI6WyJ1cm46c2VydmljZTpmaWxlLmRvd25sb2FkIl0sIm9iaiI6W1t7InBhdGgiOiIvZi83ZmJkODg4ZC00YTFkLTQxZjctYWI3Mi00MDRhZjZmNGVlYzcvZDNrbWVrdS05M2VkZDg2MC0wMmVjLTRkMmUtYjJhNi05MmFhZTNjYzViMmEucG5nIn1dXX0.grsn79H7WZObDpRz6cYgXyA9fyucGzE_Y4VgQkXCRHQ";
+
+       // let msg_author = &msg.author.name;
+      //  let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
+        let trackhandle = handler.clone().queue().current_queue();
+    
+
+       // let timeframe = now.elapsed().as_millis();
+        
+        /* check_msg(msg
+            .channel_id
+            .send_message(&ctx.http,|m|
+            m
+            .embed(|e| e.title(format!("Now Playing:")).description(title).thumbnail(thumbnail.clone()).image(link).fields(vec![
+            (format!("Channel name:  {source_artist} "), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
+            (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
+        ]))).await); */
+        
+          for _track in trackhandle {
+             check_msg(msg
+            .channel_id
+            .send_message(&ctx.http,|m|
+            m
+            .embed(|e| e.title(format!("Queued:")).description(title.clone()))).await);
+        } 
+
+        handler.enqueue_source(source);
+        ctx.set_activity(Activity::listening(context_set)).await;
+    } else {
+        check_msg(
+            msg.channel_id
+                .say(
+                    &ctx.http,
+                    "```Not in a voice channel. If im playing audio contact the authorities!```",
+                )
+                .await,
+        );
+    }
+
+    msg_clean_up(ctx, msg).await;
     Ok(())
 }
 
