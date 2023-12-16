@@ -1,11 +1,6 @@
 use serenity::builder::CreateEmbedFooter;
-use songbird::{
-    input::Input,
-    driver::Driver,
-    id::GuildId,
-    tracks::TrackQueue,
-};
-    
+use songbird::{driver::Driver, id::GuildId, input::Input, tracks::TrackQueue};
+
 use std::env;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -17,7 +12,7 @@ use std::path::Path;
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
-use songbird::SerenityInit;
+use songbird::{SerenityInit, TrackEvent};
 
 // Import the `Context` to handle commands.
 //use serenity::client::Context;
@@ -63,17 +58,13 @@ impl EventHandler for Handler {
     join,
     leave,
     mute,
-    play_from_url,
     help,
     undeafen,
     unmute,
     stop,
     search_and_play,
-    search_and_play_loop,
-    remind,
     aliases,
-    rename_channel,
-    queue_and_play
+    skip
 )]
 struct General;
 
@@ -280,85 +271,6 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
-async fn play_from_url(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let url = match args.single::<String>() {
-        Ok(url) => url,
-        Err(why) => {
-            println!("```Err starting source: {why:?}```");
-            let msg_author = &msg.author.name;
-            let url_error =
-                format!("```{msg_author} - Error! {why}. Check command Arguments are correct.```");
-            check_msg(msg.channel_id.say(&ctx.http, url_error).await);
-            msg_clean_up(ctx, msg).await;
-            return Ok(());
-        }
-    };
-
-    if !url.starts_with("http") {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "```Must provide FULL URL. Https:// ```")
-                .await,
-        );
-        msg_clean_up(ctx, msg).await;
-        return Ok(());
-    }
-
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
-
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-
-        let source = match songbird::ytdl(&url).await {
-            Ok(source) => source,
-            Err(why) => {
-                println!("```Err starting source: {why:?}```");
-                let msg_author = &msg.author.name;
-                let ffmpeg_error = format!(
-                    "```{msg_author} - Error! {why}. Check command Arguments are correct.```"
-                );
-                check_msg(msg.channel_id.say(&ctx.http, ffmpeg_error).await);
-                msg_clean_up(ctx, msg).await;
-                return Ok(());
-            }
-        };
-        let title = source
-            .metadata
-            .title
-            .clone()
-            .unwrap_or("Unknown".to_string());
-        let msg_author = &msg.author.name;
-        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
-        ctx.set_activity(Activity::listening(title)).await;
-        handler.play_only_source(source);
-
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, tracktitle_to_be_displayed)
-                .await,
-        );
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    "```Not in a voice channel. If im playing audio contact the authorities!```",
-                )
-                .await,
-        );
-    }
-    msg_clean_up(ctx, msg).await;
-    Ok(())
-}
-
-#[command]
-#[only_in(guilds)]
 async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -433,12 +345,11 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
 async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     //collects command arg into a vector. with a space inbetween each word.
     //IE: ~commamd/alias arg arg arg
-    //prints out arg arg arg 
+    //prints out arg arg arg
     let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
     //later used in ytdl_search() function to have a proper search query.
-    
-    
-    //set a time to calc initialisation of command. 
+
+    //set a time to calc initialisation of command.
     let now = Instant::now();
 
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -451,8 +362,8 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-        let queue = handler.queue();
-        
+        let queue = handler.queue().clone();
+
         let source = match songbird::input::ytdl_search(&arg_string).await {
             Ok(source) => source,
             Err(why) => {
@@ -471,8 +382,6 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             .clone()
             .unwrap_or("Unknown".to_string());
 
-        let context_set = title.clone();
-
         let source_artist = source
             .metadata
             .artist
@@ -484,28 +393,57 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
 
         let msg_author = &msg.author.name;
         let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
-        
-
-        let song = handler.enqueue_source(source);
-        for qs in handler.queue().current_queue() {
-            check_msg(msg.channel_id.
-                send_message(&ctx.http, |m| m.embed(|e| e.description(format!("Queued: {:?}", qs.metadata().title.clone().unwrap_or("Unknown".to_string()))))).await);
-        }
-        //handler.play_only_source(source);
-        
-
         let timeframe = now.elapsed().as_millis();
-        check_msg(msg
+
+        //this is current playing song.
+
+        if let Some(current) = queue.clone().current() {
+            let current = current;
+            let current_title = current
+                .metadata()
+                .title
+                .clone()
+                .unwrap_or("Unknown".to_string());
+            let current_time = current.get_info().await.unwrap();
+            let etocs = current_time.position.as_secs();
+
+            check_msg(
+                msg.channel_id
+                    .send_message(&ctx.http, |m| {
+                        m.embed(|e| {
+                            e.title(format!("Queued:"))
+                                .description(title.clone())
+                                .thumbnail(link)
+                                .image(thumbnail.clone())
+                                .fields(vec![
+                                    (
+                                        format!("Channel name:  {source_artist} "),
+                                        format!("Currently playing: {}", current_title.clone()),
+                                        true,
+                                    ),
+                                    (
+                                        format!("Requested by: {msg_author}"),
+                                        format!("Current time in track: {etocs:?} seconds"),
+                                        true,
+                                    ),
+                                ])
+                        })
+                    })
+                    .await,
+            );
+        } else {
+            let msg_author = &msg.author.name;
+            check_msg(msg
             .channel_id
             .send_message(&ctx.http,|m|
             m
-            .embed(|e| e.title(format!("Now Playing:")).description(title.clone()).thumbnail(thumbnail.clone()).image(link).fields(vec![
+            .embed(|e| e.title(format!("Now Playing (No other songs in queue):")).description(title.clone()).thumbnail(link).image(thumbnail.clone()).fields(vec![
             (format!("Channel name:  {source_artist} "), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
             (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
         ]))).await);
-        
-
-        ctx.set_activity(Activity::listening(context_set)).await;
+            msg_clean_up(ctx, msg).await;
+        };
+        let song = handler.enqueue_source(source);
     } else {
         check_msg(
             msg.channel_id
@@ -517,73 +455,6 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
         );
     }
 
-    msg_clean_up(ctx, msg).await;
-    Ok(())
-}
-
-#[command]
-#[aliases(sapl, pl, playl, pful, listenl, findl, audiol)]
-#[only_in(guilds)]
-async fn search_and_play_loop(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    //collects command arg into a vector. with a space inbetween each word.
-    //IE: ~search_and_play swimswim pier 34
-    //prints out swimswim pier 34
-    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
-    //later used in ytdl_search() function to have a proper search query.
-
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
-
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-
-        let source =
-            match songbird::input::restartable::Restartable::ytdl_search(&arg_string, true).await {
-                Ok(source) => source,
-                Err(why) => {
-                    println!("```Err starting source: {why:?}```");
-                    let msg_author = &msg.author.name;
-                    let ffmpeg_error = format!(
-                        "```{msg_author} - Error! {why}. Check command Arguments are correct.```"
-                    );
-                    check_msg(msg.channel_id.say(&ctx.http, ffmpeg_error).await);
-                    msg_clean_up(ctx, msg).await;
-                    return Ok(());
-                }
-            };
-        let loopable_source_to_input_source = Input::from(source);
-        let title = loopable_source_to_input_source
-            .metadata
-            .title
-            .clone()
-            .unwrap_or("Unknown".to_string());
-        let msg_author = &msg.author.name;
-        let tracktitle_to_be_displayed = format!("```{msg_author} Played song: {title}```");
-        ctx.set_activity(Activity::listening(format!("{title} on loop!")))
-            .await;
-        let loopable_trackhandle = handler.play_only_source(loopable_source_to_input_source);
-        loopable_trackhandle.enable_loop().unwrap();
-
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, tracktitle_to_be_displayed)
-                .await,
-        );
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    "```Not in  voice channel. If im playing audio contact the authorities!```",
-                )
-                .await,
-        );
-    }
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
@@ -621,53 +492,6 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric. Also, going to the major. ~Help for help!";
     ctx.set_activity(Activity::playing(osrs)).await;
     msg_clean_up(ctx, msg).await;
-    Ok(())
-}
-
-#[command]
-#[aliases(r)]
-#[only_in(guilds)]
-async fn remind(ctx: &Context, msg: &Message) -> CommandResult {
-    check_msg(msg.channel_id.send_message(&ctx.http,|m|
-        m
-        .content("
-    :bangbang: @everyone :bangbang:
-
-
-
-
-:bangbang: MONDAY/WEDNESDAY 8:30PM EST ESEA TOURNAMENT GAME. :bangbang:
-:bangbang: NO SHOWS WILL BE KICKED OFF ROSTER AFTER REPEATED OFFENCES. WE PAID 20$ TO PLAY, SHOW UP. REACT TO THIS POST TO CONFIRM ATTENDANCE. NO REACTION IS CONSIDERED NO SHOW. :bangbang:
-
-
-
-
-
-    :bangbang: @everyone :bangbang:
-
-
-
-
-        
-    No: :kiss_mm: Yes: :eggplant:")
-    .add_file("/home/t/torkoal/image.png"))
-    .await);
-    msg_clean_up(ctx, msg).await;
-
-    Ok(())
-}
-
-#[command]
-#[aliases(rn)]
-#[only_in(guilds)]
-async fn rename_channel(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
-    let t = msg
-        .channel_id
-        .edit(&ctx.http, |channel_name| channel_name.name(arg_string))
-        .await
-        .unwrap();
-
     Ok(())
 }
 
@@ -721,22 +545,20 @@ async fn aliases(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+async fn msg_clean_up(ctx: &Context, msg: &Message) {
+    msg.delete(&ctx.http).await.unwrap();
+}
 
+/// Checks that a message successfully sent; if not, then logs why to stdout.
+fn check_msg(result: SerenityResult<Message>) {
+    if let Err(why) = result {
+        println!("Error sending message: {:?}", why);
+    }
+}
 
 #[command]
-#[aliases(queue, q)]
 #[only_in(guilds)]
-async fn queue_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    //collects command arg into a vector. with a space inbetween each word.
-    //IE: ~commamd/alias arg arg arg
-    //prints out arg arg arg 
-    let arg_string = args.raw().collect::<Vec<&str>>().join(" ");
-    //later used in ytdl_search() function to have a proper search query.
-    
-    
-    //set a time to calc initialisation of command. 
-    //let now = Instant::now();
-
+async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
 
@@ -746,63 +568,15 @@ async fn queue_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResu
         .clone();
 
     if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-        
-        let source = match songbird::input::ytdl_search(&arg_string).await {
-            Ok(source) => source,
-            Err(why) => {
-                println!("```Err starting source (is this where it fails?): {why:?}```");
-                let msg_author = &msg.author.name;
-                let ffmpeg_error = format!("```{msg_author} - FFMPEG Error! {why}. Check command Arguments are correct.```");
-                check_msg(msg.channel_id.say(&ctx.http, ffmpeg_error).await);
-                msg_clean_up(ctx, msg).await;
-                return Ok(());
-            }
-        };
+        let handler = handler_lock.lock().await;
+        let queue = handler.queue();
 
-        let title = source
-            .metadata
-            .title
-            .clone()
-            .unwrap_or("Unknown".to_string());
+        let _ = queue.skip();
 
-        let context_set = title.clone();
+        let msg_author = &msg.author.name;
+        let msg_display = format!("``` {msg_author} Skipped current audio source.```");
 
-      /*  let source_artist = source
-            .metadata
-            .artist
-            .clone()
-            .unwrap_or("Unknown".to_string()); */
-
-      //  let thumbnail = source.metadata.thumbnail.clone().unwrap();
-      //  let link = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/7fbd888d-4a1d-41f7-ab72-404af6f4eec7/d3kmeku-93edd860-02ec-4d2e-b2a6-92aae3cc5b2a.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwic3ViIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsImF1ZCI6WyJ1cm46c2VydmljZTpmaWxlLmRvd25sb2FkIl0sIm9iaiI6W1t7InBhdGgiOiIvZi83ZmJkODg4ZC00YTFkLTQxZjctYWI3Mi00MDRhZjZmNGVlYzcvZDNrbWVrdS05M2VkZDg2MC0wMmVjLTRkMmUtYjJhNi05MmFhZTNjYzViMmEucG5nIn1dXX0.grsn79H7WZObDpRz6cYgXyA9fyucGzE_Y4VgQkXCRHQ";
-
-       // let msg_author = &msg.author.name;
-      //  let dur = source.metadata.duration.clone().unwrap().as_secs() / 60;
-        let trackhandle = handler.clone().queue().current_queue();
-    
-
-       // let timeframe = now.elapsed().as_millis();
-        
-        /* check_msg(msg
-            .channel_id
-            .send_message(&ctx.http,|m|
-            m
-            .embed(|e| e.title(format!("Now Playing:")).description(title).thumbnail(thumbnail.clone()).image(link).fields(vec![
-            (format!("Channel name:  {source_artist} "), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
-            (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
-        ]))).await); */
-        
-          for _track in trackhandle {
-             check_msg(msg
-            .channel_id
-            .send_message(&ctx.http,|m|
-            m
-            .embed(|e| e.title(format!("Queued:")).description(title.clone()))).await);
-        } 
-
-        handler.enqueue_source(source);
-        ctx.set_activity(Activity::listening(context_set)).await;
+        check_msg(msg.channel_id.say(&ctx.http, msg_display).await);
     } else {
         check_msg(
             msg.channel_id
@@ -813,18 +587,6 @@ async fn queue_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandResu
                 .await,
         );
     }
-
     msg_clean_up(ctx, msg).await;
     Ok(())
-}
-
-async fn msg_clean_up(ctx: &Context, msg: &Message) {
-    msg.delete(&ctx.http).await.unwrap();
-}
-
-/// Checks that a message successfully sent; if not, then logs why to stdout.
-fn check_msg(result: SerenityResult<Message>) {
-    if let Err(why) = result {
-        println!("Error sending message: {:?}", why);
-    }
 }
