@@ -473,7 +473,8 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
 
-        handler.stop();
+        let qh = handler.queue().clone();
+        let qsh = qh.stop();
 
         let msg_author = &msg.author.name;
         let msg_display = format!("``` {msg_author} Stopped current audio source.```");
