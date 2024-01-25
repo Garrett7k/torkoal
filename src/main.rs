@@ -1,4 +1,5 @@
 use serenity::builder::CreateEmbedFooter;
+use songbird::tracks::PlayMode;
 use songbird::{driver::Driver, id::GuildId, input::Input, tracks::TrackQueue};
 
 use std::env;
@@ -79,7 +80,7 @@ async fn main() {
 
     let framework = StandardFramework::new()
         .configure(|c| {
-            c.prefixes(vec!["!", ">", "~", ".", ",", "`"])
+            c.prefixes(vec!["!", ">", "~", ".", ",", "`", "-"])
                 .case_insensitivity(true)
         })
         .group(&GENERAL_GROUP);
@@ -352,7 +353,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
     //set a time to calc initialisation of command.
     let now = Instant::now();
 
+    //returns guild information from the sent message of user requesting this command
     let guild = msg.guild(&ctx.cache).unwrap();
+    //denote the specific guild ID information
     let guild_id = guild.id;
 
     let manager = songbird::get(ctx)
@@ -405,7 +408,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                 .clone()
                 .unwrap_or("Unknown".to_string());
             let current_time = current.get_info().await.unwrap();
-            let etocs = current_time.position.as_secs();
+            let _etocs = current_time.position.as_secs();
+            let tpt = current_time.play_time;
+            let _test = current_time.playing;
 
             check_msg(
                 msg.channel_id
@@ -423,7 +428,7 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
                                     ),
                                     (
                                         format!("Requested by: {msg_author}"),
-                                        format!("Current time in track: {etocs:?} seconds"),
+                                        format!("Current time in track: {tpt:?}"),
                                         true,
                                     ),
                                 ])
@@ -441,9 +446,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
             (format!("Channel name:  {source_artist} "), format!("Command initialized, acquired search perimeters, audio executed in {timeframe} ms"), true),
             (format!("Requested by: {msg_author}"), format!("Track Duration: {dur:?} Minutes"), true),
         ]))).await);
-            msg_clean_up(ctx, msg).await;
         };
-        let song = handler.enqueue_source(source);
+
+        let _song = handler.enqueue_source(source);
     } else {
         check_msg(
             msg.channel_id
@@ -490,7 +495,8 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
                 .await,
         );
     }
-    let osrs = "Oldschool RuneScape: Raiding in the Chambers of Xeric. Also, going to the major. ~Help for help!";
+    let osrs =
+        "Oldschool RuneScape: Getting close with Verzik. Maybe she loves me? ~Help for help!";
     ctx.set_activity(Activity::playing(osrs)).await;
     msg_clean_up(ctx, msg).await;
     Ok(())
