@@ -1,11 +1,19 @@
 use serenity::builder::CreateEmbedFooter;
-use songbird::tracks::PlayMode;
-use songbird::{driver::Driver, id::GuildId, input::Input, tracks::TrackQueue};
+// use songbird::tracks::PlayMode;
+// use songbird::{driver::Driver, id::GuildId, input::Input, tracks::TrackQueue};
 
 use std::env;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+// use futures::futures::future;
+
+// use futures::furture;
+
+use futures::stream::StreamExt;
+use scryfall::card::Game;
+use scryfall::search::prelude::*;
+use scryfall::Card;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
@@ -13,7 +21,7 @@ use std::path::Path;
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
-use songbird::{SerenityInit, TrackEvent};
+// use songbird::{SerenityInit, TrackEvent};
 
 // Import the `Context` to handle commands.
 //use serenity::client::Context;
@@ -55,17 +63,19 @@ impl EventHandler for Handler {
 //When adding extra commands, you must add the command call to this list.
 #[group]
 #[commands(
-    deafen,
-    join,
-    leave,
-    mute,
-    help,
-    undeafen,
-    unmute,
-    stop,
-    search_and_play,
-    aliases,
-    skip
+    // deafen,
+    // join,
+    // leave,
+    // mute,
+    // help,
+    // undeafen,
+    // unmute,
+    // stop,
+    // search_and_play,
+    // aliases,
+    // skip,
+    // ping,
+    card
 )]
 struct General;
 
@@ -80,7 +90,7 @@ async fn main() {
 
     let framework = StandardFramework::new()
         .configure(|c| {
-            c.prefixes(vec!["!", ">", "~", ".", ",", "`", "-"])
+            c.prefixes(vec!["!", ">", "~", ".", ",", "`", "-", "["])
                 .case_insensitivity(true)
         })
         .group(&GENERAL_GROUP);
@@ -97,7 +107,7 @@ async fn main() {
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .framework(framework)
-        .register_songbird()
+        // .register_songbird()
         .await
         .expect("Err creating client");
 
@@ -114,7 +124,7 @@ async fn main() {
     tokio::signal::ctrl_c().await.unwrap();
     println!("Received Ctrl-C, shutting down.");
 }
-
+/*
 #[command]
 #[only_in(guilds)]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
@@ -159,7 +169,33 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
+*/
+#[command]
+#[aliases(c, scry, s, sf, scryfall)]
+#[only_in(guilds)]
+async fn card(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let card_name = args.raw().collect::<Vec<&str>>().join(" ");
 
+    let card = match Card::named_fuzzy(card_name.as_str()).await {
+        Ok(card) => card,
+        Err(e) => panic!(
+            "{}",
+            format!(
+                "{:?}",
+                check_msg(msg.channel_id.say(&ctx.http, e.to_string()).await)
+            )
+        ),
+    };
+    //check_msg(msg.channel_id.say(&ctx.http, card.scryfall_uri).await);
+
+    let card_image = card.image_uris.unwrap();
+
+    check_msg(msg.channel_id.say(&ctx.http, card_image.png.unwrap()).await);
+    msg_clean_up(ctx, msg).await;
+
+    Ok(())
+}
+/*
 #[command]
 #[aliases(comehere, summon, sum, j, come, ch)]
 #[only_in(guilds)]
@@ -184,16 +220,16 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let summon = format!("```{msg_author} summoned.```");
     check_msg(msg.channel_id.say(&ctx.http, summon).await);
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    // let manager = songbird::get(ctx)
+    // .await
+    // .expect("Songbird Voice client placed in at initialisation.")
+    // .clone();
 
-    let _handler = manager.join(guild_id, connect_to).await;
+    // let _handler = manager.join(guild_id, connect_to).await;
     msg_clean_up(ctx, msg).await;
     Ok(())
-}
-
+}*/
+/*
 #[command]
 #[aliases(goodbye, unjoin, l, gb, uj)]
 #[only_in(guilds)]
@@ -228,7 +264,8 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
-
+*/
+/*
 #[command]
 #[only_in(guilds)]
 async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
@@ -269,7 +306,8 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
-
+*/
+/*
 #[command]
 #[only_in(guilds)]
 async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
@@ -304,7 +342,8 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
-
+*/
+/*
 #[command]
 #[only_in(guilds)]
 async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
@@ -339,7 +378,9 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
+*/
 
+/*
 #[command]
 #[aliases(sap, p, play, pfu, listen, find, audio, search, map)]
 #[only_in(guilds)]
@@ -463,7 +504,9 @@ async fn search_and_play(ctx: &Context, msg: &Message, args: Args) -> CommandRes
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
+*/
 
+/*
 #[command]
 #[only_in(guilds)]
 async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
@@ -501,7 +544,7 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
-
+*/
 #[command]
 #[aliases(h)]
 #[only_in(guilds)]
@@ -562,7 +605,7 @@ fn check_msg(result: SerenityResult<Message>) {
         println!("Error sending message: {:?}", why);
     }
 }
-
+/*
 #[command]
 #[only_in(guilds)]
 async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
@@ -597,3 +640,4 @@ async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
     msg_clean_up(ctx, msg).await;
     Ok(())
 }
+*/
