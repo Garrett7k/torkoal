@@ -1,15 +1,42 @@
 [package]
 name = "torkoal"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Garrett7k"]
 edition = "2021"
 
+#HEAVILY EDITED FROM VERSION 1.0... NO LONGER USES SONGBIRD LIB FOR AUDIO. ONLY EFFECTIVELY, A CHAT BOT FOR SCYFALL SEARCHES.
+#THANKS SO MUCH TO MENDESS FOR THE AMAZING SCRYFALL-RS LIB
+ 
+[package.metadata.docs.rs]
+features = ["unknown_variants"]
+
+
 [dependencies]
 tracing = "0.1"
+zeroize = "1.3.0"
 tracing-subscriber = "0.2"
 tracing-futures = "0.2"
-songbird = { version = "0.3.2", features = ["builtin-queue", "driver"] }
+# songbird = { version = "0.3.2", features = ["builtin-queue", "driver"] }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
+async-trait = "0.1.81"
+cfg-if = "1"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3.30"
+heck = { version = "0.5", optional = true }
+httpstatus = "0.1"
+itertools = "0.13"
+once_cell = "1"
+percent-encoding = "2"
+# reqwest = {version = "0.12.5", features = ["json" ,"blocking"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_urlencoded = "0.7"
+static_assertions = "1"
+thiserror = "1"
+tinyvec = "1"
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1", features = ["serde"] }
+scryfall = "0.17.8"
 
 
 [dependencies.serenity]
